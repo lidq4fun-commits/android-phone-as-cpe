@@ -1,0 +1,4 @@
+// Top-level build file. Requires Android Gradle Plugin 8.x + JDK 17.
+plugins {
+    id("com.android.application") version "8.5.2" apply false
+}

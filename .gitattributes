@@ -1,0 +1,8 @@
+# Shell/Python scripts run on Android: must stay LF, or they break.
+*.sh text eol=lf
+*.py text eol=lf
+*.sample text eol=lf
+*.gradle text eol=lf
+*.java text eol=lf
+xposed-fixed-hotspot/app/src/main/assets/xposed_init text eol=lf
+termux/boot-start-services text eol=lf

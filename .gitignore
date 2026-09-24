@@ -1,0 +1,17 @@
+# Binaries, secrets and runtime state — never commit these.
+# mihomo binary (~60 MB): download from MetaCubeX/mihomo releases
+# (android-arm64) and place at cpe-admin/bin/mihomo (chmod 755).
+cpe-admin/bin/
+*.gz
+# Runtime config with real proxy credentials:
+cpe-admin/config/
+cpe.env
+*.log
+__pycache__/
+*.pyc
+# Android build outputs:
+*.apk
+*.aab
+local.properties
+.gradle/
+build/

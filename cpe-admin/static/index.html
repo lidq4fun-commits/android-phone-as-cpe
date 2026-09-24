@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CPE 管理后台</title>
+<link rel="stylesheet" href="/static/xterm.min.css">
+<style>
+:root{--bg:#1b1f24;--card:#242a31;--fg:#d8dee4;--acc:#35bf6c;--line:#333a42}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);font:14px/1.6 -apple-system,"Segoe UI",Roboto,"Noto Sans SC",sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--card);border-bottom:1px solid var(--line)}
+header h1{font-size:17px}
+header .dot{width:10px;height:10px;border-radius:50%;background:#555}
+header .dot.on{background:var(--acc)}
+header .sp{flex:1}
+nav{display:flex;gap:4px;padding:8px 16px;background:var(--card);border-bottom:1px solid var(--line);flex-wrap:wrap}
+nav button{background:none;border:none;color:var(--fg);padding:7px 14px;border-radius:6px;cursor:pointer;font-size:14px}
+nav button.active{background:var(--acc);color:#fff}
+main{padding:16px;max-width:960px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+.card h3{font-size:14px;margin-bottom:10px;color:#9fb0bc}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);font-size:13px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.kv{display:flex;gap:8px;flex-wrap:wrap;font-size:13px}
+.kv b{color:#9fb0bc;font-weight:500}
+button.act{background:#2e3742;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:7px 16px;cursor:pointer}
+button.act:hover{border-color:var(--acc)}
+button.act.danger{color:#e06c60}
+button.act.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+pre{background:#15191d;border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;font-size:12px;max-height:420px;white-space:pre-wrap}
+#term{background:#000;border-radius:8px;padding:8px;min-height:420px}
+input[type=text],input[type=password],input[type=file]{background:#15191d;border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:7px 10px;font-size:13px;width:220px}
+.sub-item{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 0;border-bottom:1px solid var(--line)}
+.sub-item:last-child{border-bottom:0}.sub-name{min-width:160px;font-weight:600}.sub-detail{flex:1;min-width:140px}
+.switch{display:inline-flex;gap:8px;align-items:center}
+.pill{font-size:12px;padding:2px 10px;border-radius:20px;background:#2e3742}
+.pill.on{background:rgba(53,191,108,.2);color:var(--acc)}
+.hidden{display:none}
+small{color:#7b8a95}
+</style>
+</head>
+<body>
+<header>
+  <div class="dot" id="hdot"></div>
+  <h1>小米 8SE · CPE 管理后台</h1>
+  <div class="sp"></div>
+  <div class="kv"><b>SSID</b><span id="hssid">-</span></div>
+  <div class="kv"><b>信号</b><span id="hsig">-</span></div>
+  <div class="kv"><b>电量</b><span id="hbat">-</span></div>
+  <div class="kv"><b>运行</b><span id="hup">-</span></div>
+</header>
+<nav>
+  <button data-p="status" class="active">状态</button>
+  <button data-p="devices">设备</button>
+  <button data-p="proxy">代理</button>
+  <button data-p="logs">日志</button>
+  <button data-p="term">终端</button>
+</nav>
+<main>
+
+<section id="p-status">
+  <div class="card"><h3>系统</h3>
+    <div class="kv" id="sysinfo"></div>
+  </div>
+  <div class="card"><h3>流量（wlan1 + 蜂窝 累计）</h3>
+    <div class="kv" id="traffic"></div>
+  </div>
+  <div class="card"><h3>热点与服务</h3>
+    <div class="row" style="margin-bottom:10px">
+      <span class="pill" id="p-hotspot">热点</span>
+      <span class="pill" id="p-relay">LocalSend中继</span>
+      <span class="pill" id="p-proxy-state">透明代理</span>
+    </div>
+    <div class="row">
+      <button class="act" onclick="hotspot('restart')">重启热点</button>
+      <button class="act danger" onclick="if(confirm('确定重启手机？'))power('reboot')">重启手机</button>
+    </div>
+  </div>
+  <div class="card"><h3>热点设置</h3>
+    <div class="row">
+      <input type="text" id="ssid" placeholder="SSID">
+      <input type="password" id="pass" placeholder="密码">
+      <button class="act primary" onclick="setHotspot()">保存并重启热点</button>
+      <small>保存后自动应用并重启热点，连接会短暂中断</small>
+    </div>
+  </div>
+</section>
+
+<section id="p-devices" class="hidden">
+  <div class="card"><h3>已连接设备（热点网段，流量为累计值）</h3>
+    <table><thead><tr><th>IP</th><th>MAC</th><th>状态</th><th>↓ 已用流量</th><th>↑ 已用流量</th><th>操作</th></tr></thead>
+      <tbody id="devbody"></tbody></table>
+  </div>
+</section>
+
+<section id="p-proxy" class="hidden">
+  <div class="card"><h3>透明代理（Clash Meta / mihomo）</h3>
+    <p style="font-size:13px;margin-bottom:10px">开启后，连接热点的设备访问外网自动走代理；局域网（LocalSend 等）保持直连。DNS 由 mihomo 接管（redir-host 模式）。</p>
+    <div class="row">
+      <span class="pill" id="px-state">状态</span>
+      <button class="act primary" onclick="proxy('on')">开启代理</button>
+      <button class="act" onclick="proxy('off')">关闭代理</button>
+    </div>
+  </div>
+  <div class="card"><h3>订阅管理</h3>
+    <div class="row" style="margin-bottom:10px">
+      <input type="text" id="subname" placeholder="订阅名称">
+      <input type="text" id="suburl" placeholder="Clash 订阅链接" style="width:360px">
+      <button class="act primary" onclick="addUrlSub(this)">添加 URL</button>
+    </div>
+    <div class="row">
+      <input type="text" id="filename" placeholder="本地配置名称">
+      <input type="file" id="subfile" accept=".yaml,.yml,text/yaml,application/yaml" style="width:360px">
+      <button class="act primary" onclick="uploadSub(this)">上传 YAML</button>
+    </div>
+    <p style="margin-top:8px"><small id="substate">-</small></p>
+    <div id="sub-list" style="margin-top:8px"><small>正在加载…</small></div>
+  </div>
+  <div class="card"><h3>直连白名单</h3>
+    <p style="font-size:13px;margin-bottom:10px">白名单目标不会进入 mihomo，适合客户端 VPN 服务器等不能嵌套代理的地址。支持 IPv4、CIDR 和精确域名。</p>
+    <div class="row">
+      <input type="text" id="bypass-value" placeholder="例如 192.3.246.230 或 vpn.example.com" style="width:360px">
+      <button class="act primary" onclick="addBypass(this)">添加规则</button>
+    </div>
+    <p style="margin-top:8px"><small id="bypass-state">域名会在规则重载时解析为当前 IPv4 地址</small></p>
+    <div id="bypass-list" style="margin-top:8px"><small>正在加载…</small></div>
+  </div>
+  <div class="card"><h3>节点选择</h3>
+    <div id="proxy-groups"><small>代理未启动或尚未加载配置</small></div>
+  </div>
+  <div class="card"><h3>规则资源</h3>
+    <p style="font-size:13px;margin-bottom:10px">GEOIP / GEOSITE 等分流规则数据库，下载优先走本机代理。</p>
+    <div class="row" style="margin-bottom:10px">
+      <button class="act primary" onclick="updateGeo(this,'')">全部更新</button>
+      <small id="geoip-state">用于 GEOIP / GEOSITE 分流规则</small>
+    </div>
+    <table><thead><tr><th>资源</th><th>说明</th><th>大小 / 日期</th><th>操作</th></tr></thead>
+      <tbody id="geo-body"><tr><td colspan=4><small>正在加载…</small></td></tr></tbody></table>
+  </div>
+</section>
+
+<section id="p-logs" class="hidden">
+  <div class="card"><h3>日志</h3>
+    <div class="row" style="margin-bottom:10px">
+      <button class="act" onclick="showLog('boot')">开机日志</button>
+      <button class="act" onclick="showLog('relay')">中继日志</button>
+      <button class="act" onclick="showLog('mihomo')">mihomo</button>
+      <button class="act" onclick="showLog('dmesg')">dmesg</button>
+    </div>
+    <pre id="logbox">选择要查看的日志</pre>
+  </div>
+</section>
+
+<section id="p-term" class="hidden">
+  <div class="card"><h3>Termux 终端（输入 su 可获取 root）</h3>
+    <div id="term"></div>
+  </div>
+</section>
+
+</main>
+<script src="/static/xterm.min.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+async function api(path,opts){const r=await fetch(path,opts);return r.json()}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function fmtB(n){if(n>1e9)return (n/1e9).toFixed(2)+' GB';if(n>1e6)return (n/1e6).toFixed(1)+' MB';if(n>1e3)return (n/1e3).toFixed(0)+' KB';return n+' B'}
+function fmtT(s){const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return (d?d+'天':'')+h+'小时'+m+'分'}
+function pill(id,on){const e=$('#'+id);e.textContent=e.textContent.split(' ')[0]+(on?' · ON':' · OFF');e.className='pill'+(on?' on':'')}
+
+async function refresh(){
+  try{
+    const s=await api('/api/status');
+    $('#hdot').className='dot on';$('#hssid').textContent=s.ssid;
+    $('#hbat').textContent=s.battery+'%';$('#hup').textContent=fmtT(s.uptime);
+    $('#hsig').textContent=s.signal.rsrp!==null?(s.signal.rsrp+' dBm · '+s.signal.desc):'未知';
+    $('#sysinfo').innerHTML=`<b>热点接口</b><span>${s.wlan1||'-'}</span><b>网段</b><span>${s.lan}</span><b>蜂窝信号</b><span>${s.signal.rsrp!==null?s.signal.rsrp+' dBm（'+s.signal.desc+'）':'未知'}</span>`;
+    $('#traffic').innerHTML=`<b>下载</b><span>${fmtB(s.traffic.rx)}</span><b>上传</b><span>${fmtB(s.traffic.tx)}</span>`;
+    pill('p-hotspot',!!s.wlan1);pill('p-relay',s.relay);pill('p-proxy-state',s.proxy.active);
+    pill('px-state',s.proxy.active);
+    if(!$('#ssid').value)$('#ssid').value=s.ssid;
+  }catch(e){$('#hdot').className='dot'}
+}
+
+async function loadDevices(){
+  const ds=await api('/api/devices');
+  $('#devbody').innerHTML=ds.map(d=>`<tr><td>${d.ip}</td><td>${d.mac}</td><td>${d.state}</td>
+    <td>${fmtB(d.down||0)}</td><td>${fmtB(d.up||0)}</td>
+    <td>${d.mac!=='?'?`<button class="act" onclick="kick('${d.mac}')">踢下线</button>`:''}</td></tr>`).join('')||'<tr><td colspan=6>无设备</td></tr>';
+}
+function kick(mac){if(confirm('踢掉 '+mac+'？'))api('/api/kick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mac})}).then(loadDevices)}
+
+function hotspot(a){api('/api/hotspot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:a})}).then(r=>{alert(r.out||JSON.stringify(r));refresh()})}
+function setHotspot(){api('/api/hotspot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',ssid:$('#ssid').value,pass:$('#pass').value})}).then(r=>{alert(r.ok?'已保存并重启热点，请稍后重连':'失败: '+(r.error||r.out||''));refresh()})}
+function power(a){api('/api/power',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:a})}).then(()=>{})}
+function proxy(a){api('/api/proxy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:a})}).then(r=>{if(!r.ok)alert(r.error||r.out||'失败');refresh()})}
+async function addUrlSub(btn){
+  btn.disabled=true;$('#substate').textContent='正在下载并验证订阅…';
+  try{
+    const r=await api('/api/proxy/subscriptions/url',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:$('#subname').value,url:$('#suburl').value})});
+    $('#substate').textContent=r.ok?('已添加并启用'+(r.restarted?'，代理已重启':'')):('失败: '+(r.error||''));
+    if(r.ok){$('#subname').value='';$('#suburl').value='';await loadSubscriptions();loadProxyGroups()}
+  }catch(e){$('#substate').textContent='添加失败'}
+  btn.disabled=false;
+}
+async function uploadSub(btn){
+  const file=$('#subfile').files[0];
+  if(!file){$('#substate').textContent='请选择 YAML 文件';return}
+  btn.disabled=true;$('#substate').textContent='正在上传并验证 YAML…';
+  const form=new FormData();form.append('name',$('#filename').value);form.append('file',file);
+  try{
+    const r=await api('/api/proxy/subscriptions/upload',{method:'POST',body:form});
+    $('#substate').textContent=r.ok?('已上传并启用'+(r.restarted?'，代理已重启':'')):('失败: '+(r.error||''));
+    if(r.ok){$('#filename').value='';$('#subfile').value='';await loadSubscriptions();loadProxyGroups()}
+  }catch(e){$('#substate').textContent='上传失败'}
+  btn.disabled=false;
+}
+async function loadSubscriptions(){
+  const r=await api('/api/proxy/subscriptions');
+  $('#sub-list').innerHTML=r.items.map(x=>`<div class="sub-item">
+    <span class="sub-name">${esc(x.name)} ${x.id===r.active?'<span class="pill on">当前</span>':''}</span>
+    <small class="sub-detail">${x.type==='url'?'URL':'本地'} · ${esc(x.detail)}</small>
+    ${x.id!==r.active?`<button class="act" onclick="subAction(this,'${x.id}','activate')">切换</button>`:''}
+    ${x.type==='url'?`<button class="act" onclick="subAction(this,'${x.id}','refresh')">刷新</button>`:''}
+    ${x.id!==r.active?`<button class="act danger" onclick="deleteSub(this,'${x.id}')">删除</button>`:''}
+  </div>`).join('')||'<small>暂无订阅，可添加 URL 或上传本地 YAML</small>';
+}
+async function subAction(btn,id,action){
+  btn.disabled=true;$('#substate').textContent=action==='activate'?'正在切换…':'正在刷新…';
+  try{
+    const r=await api(`/api/proxy/subscriptions/${id}/${action}`,{method:'POST'});
+    $('#substate').textContent=r.ok?((action==='activate'?'切换':'刷新')+'成功'+(r.restarted?'，代理已重启':'')):('失败: '+(r.error||''));
+    if(r.ok){await loadSubscriptions();loadProxyGroups()}
+  }catch(e){$('#substate').textContent='操作失败'}
+  btn.disabled=false;
+}
+async function deleteSub(btn,id){
+  if(!confirm('确定删除这个订阅源？'))return;
+  btn.disabled=true;
+  const r=await api(`/api/proxy/subscriptions/${id}`,{method:'DELETE'});
+  $('#substate').textContent=r.ok?'已删除':('失败: '+(r.error||''));
+  await loadSubscriptions();
+}
+async function loadBypass(){
+  try{
+    const r=await api('/api/proxy/bypass');
+    $('#bypass-list').innerHTML=r.items.map(x=>`<div class="sub-item">
+      <span class="sub-name">${esc(x.value)}</span>
+      <small class="sub-detail">${x.type==='domain'?'域名':'IP/CIDR'}${x.resolved.length?' · '+x.resolved.map(esc).join(', '):' · 未解析'}</small>
+      <button class="act danger" onclick="deleteBypass(this,'${x.id}')">删除</button>
+    </div>`).join('')||'<small>暂无白名单规则</small>';
+  }catch(e){$('#bypass-list').innerHTML='<small>白名单加载失败</small>'}
+}
+async function addBypass(btn){
+  const value=$('#bypass-value').value.trim();
+  if(!value){$('#bypass-state').textContent='请输入 IPv4、CIDR 或精确域名';return}
+  btn.disabled=true;$('#bypass-state').textContent='正在添加并重载规则…';
+  try{
+    const r=await api('/api/proxy/bypass',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value})});
+    $('#bypass-state').textContent=r.ok?('添加成功'+(r.restarted?'，代理已重载':'')):('失败: '+(r.error||''));
+    if(r.ok){$('#bypass-value').value='';await loadBypass();refresh()}
+  }catch(e){$('#bypass-state').textContent='添加失败'}
+  btn.disabled=false;
+}
+async function deleteBypass(btn,id){
+  if(!confirm('删除后该目标将重新进入透明代理，确定继续？'))return;
+  btn.disabled=true;$('#bypass-state').textContent='正在删除并重载规则…';
+  try{
+    const r=await api(`/api/proxy/bypass/${id}`,{method:'DELETE'});
+    $('#bypass-state').textContent=r.ok?('已删除'+(r.restarted?'，代理已重载':'')):('失败: '+(r.error||''));
+    await loadBypass();refresh();
+  }catch(e){$('#bypass-state').textContent='删除失败'}
+  btn.disabled=false;
+}
+async function checkSub(){
+  const r=await api('/api/proxy/config');
+  $('#substate').textContent=r.configured?'已配置 ✓':'未配置';
+  loadSubscriptions();
+  loadBypass();
+  loadProxyGroups();
+}
+async function loadProxyGroups(){
+  const r=await api('/api/proxy/proxies');
+  if(!r.ok){$('#proxy-groups').innerHTML='<small>请先开启代理，或检查 mihomo 日志</small>';return}
+  $('#proxy-groups').innerHTML=r.groups.map(g=>`<div style="margin:10px 0"><b>${g.name}</b>
+    <select onchange="selectProxy('${encodeURIComponent(g.name)}',this.value)">
+      ${g.all.map(n=>`<option ${n===g.now?'selected':''}>${n}</option>`).join('')}
+    </select><button class="act" onclick="testDelay(this,'${encodeURIComponent(g.name)}')">测速</button>
+    <small class="delay">当前：${g.now||'-'}</small></div>`).join('')||'<small>订阅没有可选择的代理组</small>';
+}
+async function testDelay(btn,group){
+  const name=btn.parentElement.querySelector('select').value;
+  btn.disabled=true;btn.textContent='测速中';
+  const r=await api('/api/proxy/delay',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+  btn.disabled=false;btn.textContent='测速';
+  btn.parentElement.querySelector('.delay').textContent=r.ok?(r.delay+' ms'):'失败';
+}
+async function loadGeo(){
+  try{
+    const r=await api('/api/proxy/geo');
+    $('#geo-body').innerHTML=r.items.map(x=>`<tr>
+      <td>${esc(x.label)}<br><small>${esc(x.name)}</small></td>
+      <td><small>${esc(x.desc)}</small></td>
+      <td>${x.exists?fmtB(x.size)+'<br><small>'+new Date(x.mtime*1000).toLocaleString()+'</small>':'<small>未下载</small>'}</td>
+      <td><button class="act" onclick="updateGeo(this,'${x.name}')">更新</button></td>
+    </tr>`).join('');
+  }catch(e){$('#geo-body').innerHTML='<tr><td colspan=4><small>规则资源加载失败</small></td></tr>'}
+}
+async function updateGeo(btn,name){
+  btn.disabled=true;$('#geoip-state').textContent='正在下载（可能需要几分钟）…';
+  try{
+    const r=await api('/api/proxy/geo/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+    $('#geoip-state').textContent=r.ok?r.message:('失败: '+(r.error||''));
+    if(r.ok)loadGeo();
+  }catch(e){$('#geoip-state').textContent='更新失败'}
+  btn.disabled=false;
+}
+async function selectProxy(group,name){
+  const r=await api('/api/proxy/select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({group:decodeURIComponent(group),name})});
+  if(!r.ok)alert(r.error||'节点切换失败');
+}
+async function showLog(n){$('#logbox').textContent=(await api('/api/log/'+n)).text}
+
+// nav
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  ['status','devices','proxy','logs','term'].forEach(p=>$('#p-'+p).classList.toggle('hidden',p!==b.dataset.p));
+  if(b.dataset.p==='devices')loadDevices();
+  if(b.dataset.p==='proxy'){checkSub();loadGeo()}
+  if(b.dataset.p==='term'&&!window._termInit){window._termInit=1;termConnect()}
+});
+
+// HTTP polling terminal, compatible with restrictive browsers and proxies.
+const term=new Terminal({cursorBlink:true,fontSize:13,theme:{background:'#000'}});
+let termTimer=null, termSeq=0;
+async function termConnect(){
+  if(!term._opened){term.open($('#term'));term._opened=1;try{term.resize(90,26)}catch(e){}}
+  await fetch('/api/term/start',{method:'POST'});
+  term.onData(d=>fetch('/api/term/input',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:d})}));
+  if(termTimer)clearInterval(termTimer);
+  termTimer=setInterval(async()=>{
+    try{const r=await fetch('/api/term/output?since='+termSeq);const x=await r.json();if(x.seq>termSeq){term.write(x.full);termSeq=x.seq}}catch(e){}
+  },250);
+  term.focus();
+}
+
+refresh();setInterval(refresh,5000);
+</script>
+</body>
+</html>

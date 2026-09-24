@@ -1,0 +1,7 @@
+# Termux packages required on the CPE phone.
+# Install with: pkg update && pkg install -y <package> ...
+openssh          # sshd on port 8022
+termux-services  # runit (sv-enable sshd) + Termux:Boot integration
+python           # admin panel, proxy-on merge, localsend relay
+iproute2         # ip neigh / ip rule diagnostics
+curl             # health checks, geodata download fallback

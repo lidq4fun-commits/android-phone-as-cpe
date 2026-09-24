@@ -1,0 +1,26 @@
+# Minimal mihomo base config for the CPE gateway.
+# The admin panel merges your subscription on top of this and forces the
+# gateway fields below, so you normally don't need to edit this file.
+# Full runtime config lives at ~/cpe-admin/config/config.yaml on the phone.
+port: 0
+socks-port: 0
+redir-port: 7892
+allow-lan: true
+mode: rule
+log-level: warning
+external-controller: 127.0.0.1:9090
+dns:
+  enable: true
+  listen: 0.0.0.0:1053
+  enhanced-mode: redir-host
+  ipv6: false
+  respect-rules: true
+  default-nameserver:
+    - 223.5.5.5
+    - 119.29.29.29
+  proxy-server-nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+  nameserver:
+    - https://1.1.1.1/dns-query
+    - https://8.8.8.8/dns-query

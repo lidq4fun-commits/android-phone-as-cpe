@@ -1,0 +1,6 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# Install: ~/.termux/boot/start-services  (requires Termux:Boot app)
+# Starts runit services (e.g. sshd enabled via `sv-enable sshd`).
+
+termux-wake-lock
+source $PREFIX/etc/profile.d/start-services.sh
