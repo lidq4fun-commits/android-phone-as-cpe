@@ -211,7 +211,12 @@ mihomo DNS：国外域名走国外 DoH，代理服务器域名走国内 DoH 启�
   也不把其他苹果服务统一改为直连；完整 App Store 搜索仍需客户端验证。
 
 升级时须一起部署 `app.py`、`proxy-on.sh` 和新增的 `gateway_overrides.py`。
-不要只手改 `config/config.yaml`：应用订阅会重新生成该文件。
+应用订阅时按“基础模板 → 手机当前 `config/config.yaml` → 新订阅”逐层融合：
+字典递归合并，订阅未提供的字段保留当前值；订阅提供的列表（如 `rules`、
+`proxies`、`proxy-groups`）整体替换，不追加。空列表也是显式覆盖。
+最后强制应用网关必需设置和上述两项兼容规则，写回运行配置。
+因此普通本地设置可保留，但订阅明确提供同名字段时仍会覆盖；这不是完整快照切换。
+仅换节点时，保留的规则/分组可能引用已移除节点，导入前需保证引用一致。
 
 本地回归测试：`python -m unittest discover -s cpe-admin/tests`。
 

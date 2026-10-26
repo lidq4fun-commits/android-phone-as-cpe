@@ -21,7 +21,7 @@ import urllib.parse
 import uuid
 import yaml
 
-from gateway_overrides import apply_gateway_overrides
+from gateway_overrides import apply_gateway_overrides, merge_config
 
 from flask import Flask, jsonify, request, send_from_directory
 from flask_sock import Sock
@@ -415,10 +415,15 @@ def parse_subscription(text):
 def apply_subscription(text):
     base = yaml.safe_load(build_base_config()) or {}
     subscription = parse_subscription(text)
-    # Keep the provider's proxies/groups/rules, while adding the gateway
-    # ports and DNS defaults without creating duplicate YAML keys.
-    merged = dict(base)
-    merged.update(subscription)
+    # Missing subscription fields retain the phone's current configuration.
+    # Lists replace rather than concatenate; mappings merge recursively.
+    current = {}
+    if os.path.exists(MIHOMO_CFG):
+        with open(MIHOMO_CFG, encoding="utf-8") as f:
+            current = yaml.safe_load(f) or {}
+        if not isinstance(current, dict):
+            raise ValueError("当前配置 YAML 顶层必须是对象")
+    merged = merge_config(merge_config(base, current), subscription)
     merged["redir-port"] = 7892
     merged["allow-lan"] = True
     merged["external-controller"] = "127.0.0.1:9090"
@@ -429,16 +434,16 @@ def apply_subscription(text):
     dns["listen"] = "0.0.0.0:1053"
     dns["enhanced-mode"] = "redir-host"
     dns["ipv6"] = False
-    dns["respect-rules"] = True
-    dns["default-nameserver"] = ["223.5.5.5", "119.29.29.29"]
-    dns["proxy-server-nameserver"] = [
+    dns.setdefault("respect-rules", True)
+    dns.setdefault("default-nameserver", ["223.5.5.5", "119.29.29.29"])
+    dns.setdefault("proxy-server-nameserver", [
         "https://dns.alidns.com/dns-query",
         "https://doh.pub/dns-query",
-    ]
-    dns["nameserver"] = [
+    ])
+    dns.setdefault("nameserver", [
         "https://1.1.1.1/dns-query",
         "https://8.8.8.8/dns-query",
-    ]
+    ])
     policy = dns.setdefault("nameserver-policy", {})
     policy["+.llguanglisf.com"] = [
         "https://dns.alidns.com/dns-query",

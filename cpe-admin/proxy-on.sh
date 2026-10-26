@@ -27,16 +27,16 @@ try:
     dns['listen'] = '0.0.0.0:1053'
     dns['enhanced-mode'] = 'redir-host'
     dns['ipv6'] = False
-    dns['respect-rules'] = True
-    dns['default-nameserver'] = ['223.5.5.5', '119.29.29.29']
-    dns['proxy-server-nameserver'] = [
+    dns.setdefault('respect-rules', True)
+    dns.setdefault('default-nameserver', ['223.5.5.5', '119.29.29.29'])
+    dns.setdefault('proxy-server-nameserver', [
         'https://dns.alidns.com/dns-query',
         'https://doh.pub/dns-query'
-    ]
-    dns['nameserver'] = [
+    ])
+    dns.setdefault('nameserver', [
         'https://1.1.1.1/dns-query',
         'https://8.8.8.8/dns-query'
-    ]
+    ])
     policy = dns.setdefault('nameserver-policy', {})
     policy['+.llguanglisf.com'] = [
         'https://dns.alidns.com/dns-query',
