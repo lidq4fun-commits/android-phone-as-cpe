@@ -21,6 +21,8 @@ import urllib.parse
 import uuid
 import yaml
 
+from gateway_overrides import apply_gateway_overrides
+
 from flask import Flask, jsonify, request, send_from_directory
 from flask_sock import Sock
 
@@ -444,6 +446,7 @@ def apply_subscription(text):
     ]
     dns.pop("fallback", None)
     dns.pop("fallback-filter", None)
+    apply_gateway_overrides(merged)
     os.makedirs(MIHOMO_DIR, exist_ok=True)
     tmp = MIHOMO_CFG + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:

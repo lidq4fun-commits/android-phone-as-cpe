@@ -15,6 +15,9 @@ sh $BASE/proxy-off.sh >/dev/null 2>&1
 chmod 755 $ENGINE
 /data/data/com.termux/files/usr/bin/python - <<'PY' >/dev/null 2>&1
 import yaml
+import sys
+sys.path.insert(0, '/data/data/com.termux/files/home/cpe-admin')
+from gateway_overrides import apply_gateway_overrides
 path = '/data/data/com.termux/files/home/cpe-admin/config/config.yaml'
 try:
     with open(path) as f:
@@ -53,6 +56,7 @@ try:
         if not (isinstance(rule, str) and
                 rule.startswith('IP-CIDR,194.221.250.50/32,'))
     ]
+    apply_gateway_overrides(cfg)
     with open(path, 'w') as f:
         yaml.safe_dump(cfg, f, allow_unicode=True, sort_keys=False)
 except Exception:

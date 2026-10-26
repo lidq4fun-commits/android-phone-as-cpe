@@ -31,6 +31,7 @@ android-phone-as-cpe/
     start-termux.sh          # Magisk 开机脚本模板（SSID/密码已脱敏）
   cpe-admin/
     app.py                   # Flask 管理后台
+    gateway_overrides.py     # 订阅合并与代理启动时统一应用的本地兼容规则
     proxy-on.sh / proxy-off.sh
     boot-services.sh         # Termux 上下文开机入口（后台+代理）
     cpe.env.sample           # SSID/密码/LAN 模板
@@ -156,6 +157,7 @@ cmd wifi start-softap <SSID> wpa2 <PASSPHRASE>
 # 1. 后台与代理（Termux 用户）
 ~/cpe-admin/app.py ~/cpe-admin/proxy-on.sh ~/cpe-admin/proxy-off.sh
 ~/cpe-admin/boot-services.sh ~/cpe-admin/static/index.html
+# gateway_overrides.py 必须与 app.py 一起部署到 ~/cpe-admin/
 cp cpe.env.sample ~/cpe-admin/cpe.env   # 然后填真实 SSID/密码
 # xterm.js（终端页需要）：把 xterm.min.js + xterm.min.css 放入 static/
 # mihomo 二进制：放到 /data/adb/mihomo，chmod 755（root 可执行）
@@ -195,6 +197,23 @@ mihomo DNS：国外域名走国外 DoH，代理服务器域名走国内 DoH 启�
 热点 IPv6 封堵（只代理 IPv4）。
 
 ## 8. 常见坑
+
+### App Store 搜索与应用内广告兼容覆盖
+
+`cpe-admin/gateway_overrides.py` 在应用订阅后、每次启动代理时统一执行，
+不会修改订阅原始文件；刷新或切换订阅后也会重新应用：
+
+- 删除订阅中的 `GEOSITE,category-ads-all,REJECT` 广泛广告拦截规则，
+  避免阻断 AdMob 等应用内广告；其他显式广告拦截规则仍保留，不保证所有广告均可加载。
+- 仅将 `amp-api-search-edge.apps.apple.com` 设为优先直连，并使用国内 DoH。
+  实机测试中，该搜索域名经国外 DNS 选出的 Fastly CDN 返回 HTTP 503，
+  国内 DNS + 直连可获得苹果接口响应。此调整不改变 Apple ID 商店地区，
+  也不把其他苹果服务统一改为直连；完整 App Store 搜索仍需客户端验证。
+
+升级时须一起部署 `app.py`、`proxy-on.sh` 和新增的 `gateway_overrides.py`。
+不要只手改 `config/config.yaml`：应用订阅会重新生成该文件。
+
+本地回归测试：`python -m unittest discover -s cpe-admin/tests`。
 
 1. **LSPosed 下错包**：Magisk 开 Zygisk 必须用 `*-zygisk-release.zip`，
    Riru 版报 `Riru is not installed`。
